@@ -1,0 +1,21 @@
+{
+  "score": "{}",
+  "SBHead1": "Score",
+  "SBHead2": "Kills",
+  "SBHead3": "Deaths",
+  "SBHead4": "Captures",
+  "OBJ_A": "A",
+  "OBJ_B": "B",
+  "OBJ_C": "C",
+  "TEAM_SWITCH_TOGGLE": "TS",
+  "TEAM_SWITCH_LABEL": "Team Switch",
+  "TEAM_SWITCH_JOIN_1": "Join Team 1",
+  "TEAM_SWITCH_JOIN_2": "Join Team 2",
+  "TEAM_SWITCH_CLOSE": "Close",
+  "TEAM_SWITCH_HINT": "Triple tap Interact (E) to open Team Switch",
+  "TEAM_SWITCH_DEBUG_WAIT": "TS Debug: waiting for interact",
+  "TEAM_SWITCH_DEBUG_ARMED": "TS Debug: interact point armed",
+  "TEAM_SWITCH_DEBUG_TRIPLE": "TS Debug: triple interact detected",
+  "TEAM_SWITCH_DEBUG_TAP": "TS Debug: tap {0}/3",
+  "TEAM_SWITCH_DEBUG_TIMEOUT": "TS Debug: panel auto-closed (safety)"
+}
