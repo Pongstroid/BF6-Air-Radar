@@ -36,7 +36,7 @@
  * - playerGroundYTime tracking prevents permanently stuck below-radar states
  * - 16 slots per type per team (64 total contacts)
  *
- * Copyright (c) 2026 Ethan Mills, Pongstroid. All rights reserved.
+ * Copyright (c) 2026 Pongstroid. All rights reserved.
  */
 
 // -----------------------------------------------------------------------------
