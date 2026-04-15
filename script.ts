@@ -1,5 +1,5 @@
 /**
- * Air_Radar v42 (Standalone)
+ * Air_Radar v43 (Standalone, Self-Contained)
  * Radar-only script for Battlefield 6 Portal.
  * Drop into any game mode with aircraft to get a working radar HUD.
  *
@@ -25,6 +25,11 @@
  * - Friendlies always visible regardless of altitude.
  * - Your own blip dims when you're below radar.
  *
+ * v43 Changes over v42 standalone:
+ * - Added full Portal lifecycle exports so the radar works as a true standalone drop-in script
+ * - Added F16/F61V fallback aircraft detection used in the working integrated mode
+ * - Added OnRayCastMissed handler to clear stale terrain state when needed
+ *
  * v42 Changes over v41 standalone:
  * - Raycast hit validation: surface normal check (ny < 0.7 rejected), hit-above-player check,
  *   altitude-drop rejection (>60m to <40m in one tick), 3-second staleness timeout
@@ -46,16 +51,21 @@ const playerGroundYTime: Record<number, number> = {};
 // -----------------------------------------------------------------------------
 // AIRCRAFT DETECTION
 // -----------------------------------------------------------------------------
-function checkIsAircraft(vehicle: any): boolean {
+function checkIsKnownGround(vehicle: any): boolean {
     try {
-        if (mod.CompareVehicleName(vehicle, mod.VehicleList.F16)) return true;
-        if (mod.CompareVehicleName(vehicle, mod.VehicleList.F22)) return true;
-        if (mod.CompareVehicleName(vehicle, mod.VehicleList.JAS39)) return true;
-        if (mod.CompareVehicleName(vehicle, mod.VehicleList.SU57)) return true;
-        if (mod.CompareVehicleName(vehicle, mod.VehicleList.AH64)) return true;
-        if (mod.CompareVehicleName(vehicle, mod.VehicleList.Eurocopter)) return true;
-        if (mod.CompareVehicleName(vehicle, mod.VehicleList.UH60)) return true;
-        if (mod.CompareVehicleName(vehicle, mod.VehicleList.UH60_Pax)) return true;
+        if (mod.CompareVehicleName(vehicle, mod.VehicleList.Abrams)) return true;
+        if (mod.CompareVehicleName(vehicle, mod.VehicleList.Leopard)) return true;
+        if (mod.CompareVehicleName(vehicle, mod.VehicleList.Cheetah)) return true;
+        if (mod.CompareVehicleName(vehicle, mod.VehicleList.CV90)) return true;
+        if (mod.CompareVehicleName(vehicle, mod.VehicleList.Gepard)) return true;
+        if (mod.CompareVehicleName(vehicle, mod.VehicleList.M2Bradley)) return true;
+        if (mod.CompareVehicleName(vehicle, mod.VehicleList.Marauder)) return true;
+        if (mod.CompareVehicleName(vehicle, mod.VehicleList.Marauder_Pax)) return true;
+        if (mod.CompareVehicleName(vehicle, mod.VehicleList.Flyer60)) return true;
+        if (mod.CompareVehicleName(vehicle, mod.VehicleList.GolfCart)) return true;
+        if (mod.CompareVehicleName(vehicle, mod.VehicleList.Quadbike)) return true;
+        if (mod.CompareVehicleName(vehicle, mod.VehicleList.RHIB)) return true;
+        if (mod.CompareVehicleName(vehicle, mod.VehicleList.Vector)) return true;
     } catch {}
     return false;
 }
@@ -68,6 +78,21 @@ function checkIsHeli(vehicle: any): boolean {
         if (mod.CompareVehicleName(vehicle, mod.VehicleList.UH60_Pax)) return true;
     } catch {}
     return false;
+}
+
+function checkIsAircraft(vehicle: any): boolean {
+    try {
+        if (mod.CompareVehicleName(vehicle, mod.VehicleList.F22)) return true;
+        if (mod.CompareVehicleName(vehicle, mod.VehicleList.JAS39)) return true;
+        if (mod.CompareVehicleName(vehicle, mod.VehicleList.SU57)) return true;
+        if (mod.CompareVehicleName(vehicle, mod.VehicleList.AH64)) return true;
+        if (mod.CompareVehicleName(vehicle, mod.VehicleList.Eurocopter)) return true;
+        if (mod.CompareVehicleName(vehicle, mod.VehicleList.UH60)) return true;
+        if (mod.CompareVehicleName(vehicle, mod.VehicleList.UH60_Pax)) return true;
+        if (mod.CompareVehicleName(vehicle, mod.VehicleList.F16)) return true;
+    } catch {}
+    if (checkIsKnownGround(vehicle)) return false;
+    return true;
 }
 
 // -----------------------------------------------------------------------------
@@ -256,21 +281,56 @@ function radarTickForPlayer(eventPlayer: mod.Player) {
 }
 
 // -----------------------------------------------------------------------------
-// EXPORTS — Hook these into your game mode
+// PORTAL EXPORTS
 // -----------------------------------------------------------------------------
-// Call in OnGameModeStarted:
-//   radarInitializedPlayers.clear();
-//   radarVisiblePlayers.clear();
-// Call in initializePlayerState or OnPlayerJoinGame:
-//   createRadarForPlayer(player);
-// Call in OngoingPlayer:
-//   radarTickForPlayer(eventPlayer);
-// Call in OnPlayerEnterVehicle:
-//   if (checkIsAircraft(eventVehicle)) setRadarVisible(eventPlayer, true);
-// Call in OnPlayerExitVehicle:
-//   setRadarVisible(eventPlayer, false);
+export async function OnGameModeStarted() {
+    radarInitializedPlayers.clear();
+    radarVisiblePlayers.clear();
 
-// Required export — add to your exports:
+    const players = mod.AllPlayers();
+    const count = mod.CountOf(players);
+    for (let i = 0; i < count; i++) {
+        const player = mod.ValueInArray(players, i) as mod.Player;
+        if (!player || !mod.IsPlayerValid(player)) continue;
+        createRadarForPlayer(player);
+        setRadarVisible(player, false);
+    }
+}
+
+export function OnPlayerJoinGame(eventPlayer: mod.Player) {
+    if (!eventPlayer || !mod.IsPlayerValid(eventPlayer)) return;
+    createRadarForPlayer(eventPlayer);
+    setRadarVisible(eventPlayer, false);
+}
+
+export function OnPlayerEnterVehicle(eventPlayer: mod.Player, eventVehicle: mod.Vehicle) {
+    if (!eventPlayer || !mod.IsPlayerValid(eventPlayer)) return;
+    createRadarForPlayer(eventPlayer);
+    try {
+        if (Number(mod.GetPlayerVehicleSeat(eventPlayer)) !== 0) {
+            setRadarVisible(eventPlayer, false);
+            return;
+        }
+    } catch {}
+    try {
+        if (eventVehicle && checkIsAircraft(eventVehicle)) setRadarVisible(eventPlayer, true);
+        else setRadarVisible(eventPlayer, false);
+    } catch {
+        setRadarVisible(eventPlayer, false);
+    }
+}
+
+export function OnPlayerExitVehicle(eventPlayer: mod.Player, eventVehicle: mod.Vehicle) {
+    if (!eventPlayer || !mod.IsPlayerValid(eventPlayer)) return;
+    setRadarVisible(eventPlayer, false);
+}
+
+export function OngoingPlayer(eventPlayer: mod.Player) {
+    if (!eventPlayer || !mod.IsPlayerValid(eventPlayer)) return;
+    createRadarForPlayer(eventPlayer);
+    radarTickForPlayer(eventPlayer);
+}
+
 export function OnRayCastHit(eventPlayer: mod.Player, eventPoint: mod.Vector, eventNormal: mod.Vector) {
     try {
         const pid = mod.GetObjId(eventPlayer);
@@ -308,5 +368,18 @@ export function OnRayCastHit(eventPlayer: mod.Player, eventPoint: mod.Vector, ev
         if (!isStale && lastGY !== undefined && Math.abs(gy - lastGY) > 50) return;
         playerGroundY[pid] = gy;
         playerGroundYTime[pid] = now;
+    } catch {}
+}
+
+
+export function OnRayCastMissed(eventPlayer: mod.Player) {
+    try {
+        const pid = mod.GetObjId(eventPlayer);
+        const now = Date.now();
+        const lastTime = playerGroundYTime[pid];
+        if (lastTime === undefined || (now - lastTime) > 3000) {
+            delete playerGroundY[pid];
+            delete playerGroundYTime[pid];
+        }
     } catch {}
 }
